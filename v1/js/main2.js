@@ -1,3 +1,8 @@
+let pointerLocked = false;
+let lookDeltaX = 0;
+let lookDeltaY = 0;
+const lookSensitivity = 0.025; // equivalent to the old "/100" divisor
+
 function firstPerson(cam){
   cam.firstPersonState = cam.firstPersonState || {
     azimuth: -atan2(cam.eyeZ - cam.centerZ, cam.eyeX - cam.centerX),
@@ -64,54 +69,74 @@ let canvas;
 let angle = 0;
 let x = 0;
 let y = 0;
-// let cam;
 
-function setup() {
-  canvas = createCanvas(windowWidth, windowHeight, WEBGL);
-  canvas.position(0, 0);
-  canvas.style("z-index",-1);
-  
-  angleMode(DEGREES);
-
-  // cam = createCamera();
-  // // cam.lookAt(0, 0, 0);
-  // translate(width/16, 0, height/5);
-
-}
+let pg;
 
 function windowResized() {
     resizeCanvas(windowWidth, windowHeight);
 }
 
+function requestLook(e) {
+  // Don't trigger pointer lock for clicks on real page controls (nav links, buttons, etc.)
+  // so those always behave like normal links/buttons, unaffected by the 3D scene.
+  if(e.target.closest('a, button, input, select, textarea')) return;
+  canvas.elt.requestPointerLock();
+}
+
+function onPointerLockChange() {
+  pointerLocked = (document.pointerLockElement === canvas.elt);
+  // Clear any leftover deltas so re-locking doesn't cause a sudden jump
+  lookDeltaX = 0;
+  lookDeltaY = 0;
+}
+
+function onMouseMove(e) {
+  if(pointerLocked){
+    lookDeltaX += e.movementX;
+    lookDeltaY += e.movementY;
+  }
+}
+
+async function setup() {
+  canvas = createCanvas(windowWidth, windowHeight, WEBGL);
+  canvas.position(0, 0);
+  canvas.style("z-index",-1);
+  
+  angleMode(DEGREES);
+  frameRate(60); // cap the sketch at 60fps
+  cam1 = createCamera()
+  
+  // Pointer Lock setup: click anywhere on the page (except nav links/buttons) to
+  // enable unlimited FPS-style mouse look. Listening on `document` instead of the
+  // canvas itself is necessary because the canvas sits at z-index -1 behind the
+  // page content, so it never receives click events directly.
+  // Browsers require a user gesture (the click) before pointer lock can be granted,
+  // and release it automatically when the user presses Esc.
+  document.addEventListener('click', requestLook);
+  document.addEventListener('pointerlockchange', onPointerLockChange);
+  document.addEventListener('mousemove', onMouseMove);
+
+  // 3D Text
+  pg = createGraphics(400, 400);
+  pg.background(0, 0, 0, 0);
+  pg.fill(0);
+  pg.textSize(20);
+  pg.textAlign(CENTER, CENTER);
+  pg.text('Default Blender Cube', pg.width / 2, pg.height / 2);
+}
+
 function draw() {
-  // frameRate(24);
+  background(220);
+  drawScene();
+  firstPerson(cam1);
+
+}
+
+function drawScene() {
   clear();
 
   translate(100, 0, 500);
-  
-  // directionalLight(140, 140, 140, 1, 1, -0.7);
-  // directionalLight(160, 100, 110, -1, -1, 0.7);
-  
-  // orbitControl();
-  
-  // normalMaterial(200, 0, 0);
-  // specularMaterial(200, 0, 0);
-  
-  emissiveMaterial(255, 255, 255);
-
-  // var p5jsHover = document.querySelector(".selected-page");
-  // p5jsHover.addEventListener("mouseover", p5jsFast);
-  // p5jsHover.addEventListener('mouseout', p5jsSlow);
-
-  // function p5jsFast(event) {
-  //   console.log(event.target);
-  //   emissiveMaterial(0, 100, 100);
-  // }
-  // function p5jsSlow(event) {
-  //   console.log(event.target);
-  // }
-
-  
+  // emissiveMaterial(255, 255, 255);
   strokeWeight(0);
   
   // SPEED OF SPHERES
@@ -120,22 +145,13 @@ function draw() {
   //SPEED OF TORUSES
   angle += 0.2;
   
-  
   sinX = sin(x);
   cosY = cos(y);
-
-  // ROTATING CAMERA
-
-  // cam.roll(mouseX/1000);
-  // cam.roll(-mouseY/1000);
-  // cam.lookAt(0,0,0);
-  // cam.setPosition(0, 0, 800);
-
 
   x2 = map(sinX, 0, 1, 0, 160);
   y2 = map(cosY, 0, 1, 0, 160);
   
-  // Sphere-1
+   // Sphere-1
   push();
   // translate x, y, z
   translate(x2, x2, y2);
@@ -172,9 +188,29 @@ function draw() {
   torus(390, 15, 50);
   pop();
   
-  
-  
-  //original ellipse below
-  // ellipse(x2, y2, 50, 50);
-  // sphere(x2, y2, height);
+  // floor
+  // push()
+  //   fill(200, 255, 200)
+  //   noStroke()
+  //   translate(-90, 90, 800)
+  //   rotateX(90)
+  //   plane(200)
+  // pop()
+
+  lights()
+  pointLight(255, 255, 255, -120, 0, 900)
+
+  push()
+    fill(150, 150, 150)
+    translate(-90, 65, 800)
+    box(50)
+  pop()
+
+  // Text Plane
+  push()
+    scale(-1, 1, 1);
+    translate(90, 0, 800);
+    texture(pg);
+    plane(200, 200);
+  pop()
 }
